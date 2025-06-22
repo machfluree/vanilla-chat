@@ -1,6 +1,6 @@
-# 📡 Vanilla WebSocket Chat Server
+# 📡 Vanilla Chat
 
-A lightweight WebSocket server using **pure Node.js** — no external libraries — that supports:
+A lightweight WebSocket server using **pure Node.js** — no external bullshits — that supports:
 
 - ✅ Real-time text chat
 - ✅ Binary file transfer (images, audio, videos, documents)
