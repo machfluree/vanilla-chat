@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Vanilla WebSocket Chat</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+    }
+    #chat {
+      border: 1px solid #ccc;
+      height: 300px;
+      overflow-y: auto;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #f9f9f9;
+    }
+    #chat div {
+      margin-bottom: 8px;
+    }
+    #chat img {
+      max-width: 100%;
+      display: block;
+      margin-top: 5px;
+    }
+    .self {
+      color: green;
+    }
+    .system {
+      color: gray;
+      font-style: italic;
+    }
+    .file-link {
+      display: inline-block;
+      margin-top: 4px;
+    }
+    input[type="text"] {
+      width: 70%;
+      padding: 5px;
+    }
+    input[type="file"] {
+      width: 28%;
+    }
+    button {
+      padding: 5px 10px;
+      margin-left: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h2>🗨️ Vanilla Chat</h2>
+  <div id="chat"></div>
+  <input type="text" id="messageInput" placeholder="Type a lovely message">
+  <button id="sendBtn">Send love</button>
+  <br><br>
+  <!-- <input type="file" id="fileInput" multiple> -->
+
+  <script>
+    const chat = document.getElementById('chat');
+    const ws = new WebSocket('ws://localhost:8080');
+
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => logSystem('✅ Connected to server');
+    ws.onclose = () => logSystem('❌ You broke it you dipshit! Now its disconnected from the fucking server');
+    ws.onerror = (e) => console.error('WebSocket error (FUUUUUUCK!):', e);
+
+    ws.onmessage = (event) => {
+      if (typeof event.data === 'string') {
+        logMessage('👤 ' + event.data);
+      } else {
+        handleBinary(event.data);
+      }
+    };
+
+    document.getElementById('sendBtn').onclick = () => {
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+      if (message) {
+        ws.send(message);
+        logMessage('🧑‍💻 You: ' + message, true);
+        input.value = '';
+      }
+    };
+
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const files = e.target.files;
+      for (const file of files) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const fileData = new Uint8Array(reader.result);
+          const meta = {
+            type: file.type,
+            filename: file.name
+          };
+          const metaJson = JSON.stringify(meta);
+          const metaBuffer = new TextEncoder().encode(metaJson);
+          const metaLen = new Uint8Array(4);
+          new DataView(metaLen.buffer).setUint32(0, metaBuffer.length);
+
+          const total = new Uint8Array(4 + metaBuffer.length + fileData.length);
+          total.set(metaLen, 0);
+          total.set(metaBuffer, 4);
+          total.set(fileData, 4 + metaBuffer.length);
+
+          ws.send(total);
+          logMessage(`📤 You sent file: ${file.name}`, true);
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    });
+
+    function logMessage(msg, isSelf = false) {
+      const div = document.createElement('div');
+      div.textContent = msg;
+      if (isSelf) div.classList.add('self');
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function logSystem(msg) {
+      const div = document.createElement('div');
+      div.textContent = msg;
+      div.className = 'system';
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    // Fucking faulty code to handle binary messages
+    // don't know any shit about it
+    // will update fuckingly
+    function handleBinary(buffer) {
+      const view = new DataView(buffer);
+      const metaLength = view.getUint32(0);
+      const metaJson = new TextDecoder().decode(buffer.slice(4, 4 + metaLength));
+      const meta = JSON.parse(metaJson);
+      const content = buffer.slice(4 + metaLength);
+
+      const div = document.createElement('div');
+
+      if (meta.type.startsWith('image/')) {
+        const blob = new Blob([content], { type: meta.type });
+        const url = URL.createObjectURL(blob);
+        const img = document.createElement('img');
+        img.src = url;
+        div.textContent = `📷 Image: ${meta.filename}`;
+        div.appendChild(img);
+      } else {
+        const blob = new Blob([content], { type: meta.type });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = meta.filename;
+        link.textContent = `📎 Download: ${meta.filename}`;
+        link.className = 'file-link';
+        div.appendChild(link);
+      }
+
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+</html>
